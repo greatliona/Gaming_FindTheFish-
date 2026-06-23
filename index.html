@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>找魚魚</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="playfield" aria-label="找魚魚遊戲區">
+        <canvas id="backgroundCanvas"></canvas>
+        <canvas id="gameCanvas"></canvas>
+        <div class="topbar">
+          <div class="mission">
+            <span class="label">找</span>
+            <strong id="targetLabel">笑笑的魚</strong>
+          </div>
+        </div>
+        <div id="feedback" class="feedback"></div>
+        <button id="startButton" class="start-button" type="button">開始</button>
+        <div id="gameOverModal" class="game-over hidden" role="dialog" aria-modal="true" aria-labelledby="gameOverTitle">
+          <div class="game-over-panel">
+            <span id="gameOverTitle">遊戲結束</span>
+            <strong id="finalScoreValue">0</strong>
+            <label for="playerNameInput">名字</label>
+            <div class="name-row">
+              <input id="playerNameInput" maxlength="14" autocomplete="off" />
+              <button id="saveScoreButton" type="button">送出</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside class="side-panel">
+        <div class="mark">找魚魚</div>
+        <div class="target-card">
+          <span>本回合</span>
+          <strong id="sideTargetLabel">笑笑的魚</strong>
+        </div>
+        <div class="meters side-meters">
+          <div><span id="timeValue">45.0</span><small>秒</small></div>
+          <div><span id="scoreValue">0</span><small>分</small></div>
+          <div><span id="streakValue">0</span><small>連擊</small></div>
+        </div>
+        <div class="run-stats">
+          <div>
+            <small>等級</small>
+            <strong id="levelValue">1</strong>
+          </div>
+          <div>
+            <small>最佳</small>
+            <strong id="bestValue">0</strong>
+          </div>
+        </div>
+        <section class="leaderboard" aria-label="前十名">
+          <div class="leaderboard-title">前十名</div>
+          <ol id="leaderboardList"></ol>
+        </section>
+        <div class="combo-bar" aria-hidden="true">
+          <div id="comboFill"></div>
+        </div>
+        <button id="restartButton" class="ghost-button" type="button">重開</button>
+      </aside>
+    </main>
+    <script src="game-data.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
