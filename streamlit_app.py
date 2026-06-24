@@ -148,4 +148,4 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-components.html(load_game_html(asset_stamp()), height=800, scrolling=False)
+components.html(load_game_html(asset_stamp()), height=844, scrolling=True)
