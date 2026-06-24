@@ -20,6 +20,7 @@ const finalScoreValue = document.getElementById("finalScoreValue");
 const playerNameInput = document.getElementById("playerNameInput");
 const saveScoreButton = document.getElementById("saveScoreButton");
 const leaderboardList = document.getElementById("leaderboardList");
+const leaderboardTitle = document.getElementById("leaderboardTitle");
 
 const TARGETS = [
   { key: "smile", label: "笑笑的魚" },
@@ -37,6 +38,7 @@ const FISH_PER_LEVEL = 5;
 const SMALL_FISH_AREA = 9200;
 const LEADERBOARD_KEY = "fishFinderLeaderboard";
 const LAST_NAME_KEY = "fishFinderLastName";
+const recordConfig = window.FISH_GAME_RECORD || {};
 
 const state = {
   dpr: 1,
@@ -58,6 +60,7 @@ const state = {
   variantImages: new Map(),
   leaderboard: [],
   scoreSaved: false,
+  leaderboardMode: "local",
 };
 
 function rand(min, max) {
@@ -205,8 +208,80 @@ function saveLeaderboard() {
   localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(state.leaderboard.slice(0, 10)));
 }
 
+function supabaseEnabled() {
+  return Boolean(recordConfig.supabaseUrl && recordConfig.supabaseKey && recordConfig.table);
+}
+
+function supabaseEndpoint(query = "") {
+  const base = recordConfig.supabaseUrl.replace(/\/$/, "");
+  return `${base}/rest/v1/${recordConfig.table}${query}`;
+}
+
+function supabaseHeaders(extra = {}) {
+  return {
+    apikey: recordConfig.supabaseKey,
+    Authorization: `Bearer ${recordConfig.supabaseKey}`,
+    ...extra,
+  };
+}
+
+async function fetchOnlineLeaderboard() {
+  if (!supabaseEnabled()) return null;
+  const query = "?select=player_name,score,level,created_at&order=score.desc,created_at.asc&limit=10";
+  const response = await fetch(supabaseEndpoint(query), {
+    headers: supabaseHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`leaderboard ${response.status}`);
+  }
+  const rows = await response.json();
+  return rows.map((row) => ({
+    name: String(row.player_name || "玩家").slice(0, 14),
+    score: Number(row.score) || 0,
+    level: Number(row.level) || 1,
+    at: row.created_at || "",
+  }));
+}
+
+async function insertOnlineScore(name, score, level) {
+  if (!supabaseEnabled()) return false;
+  const response = await fetch(supabaseEndpoint(), {
+    method: "POST",
+    headers: supabaseHeaders({
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    }),
+    body: JSON.stringify({
+      player_name: name,
+      score,
+      level,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`score ${response.status}`);
+  }
+  return true;
+}
+
+async function refreshLeaderboard() {
+  try {
+    const online = await fetchOnlineLeaderboard();
+    if (online) {
+      state.leaderboard = online;
+      state.leaderboardMode = "online";
+      renderLeaderboard();
+      return;
+    }
+  } catch {
+    state.leaderboardMode = "local";
+  }
+  state.leaderboard = loadLeaderboard();
+  renderLeaderboard();
+}
+
 function renderLeaderboard() {
   leaderboardList.innerHTML = "";
+  leaderboardTitle.textContent = state.leaderboardMode === "online" ? "線上前十名" : "本機前十名";
   if (!state.leaderboard.length) {
     const item = document.createElement("li");
     item.className = "empty-score";
@@ -225,14 +300,27 @@ function renderLeaderboard() {
   });
 }
 
-function addLeaderboardScore(name, score) {
+function addLocalLeaderboardScore(name, score, level) {
   const safeName = (name || "").trim().slice(0, 14) || "玩家";
   localStorage.setItem(LAST_NAME_KEY, safeName);
-  state.leaderboard.push({ name: safeName, score, at: new Date().toISOString() });
+  state.leaderboard.push({ name: safeName, score, level, at: new Date().toISOString() });
   state.leaderboard.sort((a, b) => b.score - a.score);
   state.leaderboard = state.leaderboard.slice(0, 10);
   saveLeaderboard();
   renderLeaderboard();
+}
+
+async function addLeaderboardScore(name, score, level) {
+  const safeName = (name || "").trim().slice(0, 14) || "玩家";
+  localStorage.setItem(LAST_NAME_KEY, safeName);
+  addLocalLeaderboardScore(safeName, score, level);
+  try {
+    await insertOnlineScore(safeName, score, level);
+    await refreshLeaderboard();
+  } catch {
+    state.leaderboardMode = "local";
+    renderLeaderboard();
+  }
 }
 
 function makeFish(sprite, forced = {}) {
@@ -305,7 +393,9 @@ function buildSchool() {
     const sprite = pick(decoyPool);
     fish.push(makeFish(sprite, { scale: sizeForFish(false) }));
   }
-  state.fish = shuffle(fish);
+  const targets = fish.filter((fishItem) => fishItem.target);
+  const decoys = fish.filter((fishItem) => !fishItem.target);
+  state.fish = [...shuffle(decoys), ...shuffle(targets)];
 }
 
 function newRound() {
@@ -360,10 +450,10 @@ function showGameOver() {
   window.setTimeout(() => playerNameInput.focus(), 80);
 }
 
-function submitScore() {
+async function submitScore() {
   if (state.scoreSaved) return;
   state.scoreSaved = true;
-  addLeaderboardScore(playerNameInput.value, state.score);
+  await addLeaderboardScore(playerNameInput.value, state.score, state.level);
   gameOverModal.classList.add("hidden");
   startButton.classList.remove("hidden");
   showFeedback("已紀錄", true);
@@ -586,8 +676,7 @@ playerNameInput.addEventListener("keydown", (event) => {
 window.addEventListener("resize", resize);
 
 resize();
-state.leaderboard = loadLeaderboard();
-renderLeaderboard();
+refreshLeaderboard();
 bestValue.textContent = String(state.best);
 loadImages().then(() => {
   buildSchool();

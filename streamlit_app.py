@@ -12,7 +12,7 @@ ROOT = Path(__file__).parent
 
 
 def asset_stamp() -> tuple[float, ...]:
-    paths = [ROOT / "styles.css", ROOT / "game.js", ROOT / "sprites.json"]
+    paths = [ROOT / "styles.css", ROOT / "game.js", ROOT / "fish_game_record.js", ROOT / "sprites.json"]
     paths.extend(sorted((ROOT / "sprites").glob("fish_*.png")))
     return tuple(path.stat().st_mtime for path in paths)
 
@@ -21,6 +21,7 @@ def asset_stamp() -> tuple[float, ...]:
 def load_game_html(stamp: tuple[float, ...]) -> str:
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     game_js = (ROOT / "game.js").read_text(encoding="utf-8")
+    record_js = (ROOT / "fish_game_record.js").read_text(encoding="utf-8")
     sprites = json.loads((ROOT / "sprites.json").read_text(encoding="utf-8"))
 
     for sprite in sprites:
@@ -91,8 +92,8 @@ def load_game_html(stamp: tuple[float, ...]) -> str:
             <strong id="bestValue">0</strong>
           </div>
         </div>
-        <section class="leaderboard" aria-label="本機前十名">
-          <div class="leaderboard-title">本機前十名</div>
+        <section class="leaderboard" aria-label="前十名">
+          <div id="leaderboardTitle" class="leaderboard-title">前十名</div>
           <ol id="leaderboardList"></ol>
         </section>
         <div class="combo-bar" aria-hidden="true">
@@ -103,6 +104,9 @@ def load_game_html(stamp: tuple[float, ...]) -> str:
     </main>
     <script>
       window.FISH_SPRITES = {sprite_data};
+    </script>
+    <script>
+      {record_js}
     </script>
     <script>
       {game_js}
