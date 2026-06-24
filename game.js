@@ -29,9 +29,11 @@ const TARGETS = [
 ];
 
 const TOP_SAFE = 190;
-const ALL_FISH_BOOST = 1.1;
-const SMALL_FISH_BOOST = 1.15;
-const SMALLEST_EXTRA_BOOST = 1.1;
+const SIZE_CLASSES = [0.8, 0.9, 1];
+const TARGET_SIZE_CLASSES = [0.8, 0.9];
+const MIN_FISH_COUNT = 10;
+const MAX_FISH_COUNT = 100;
+const FISH_PER_LEVEL = 5;
 const SMALL_FISH_AREA = 9200;
 const LEADERBOARD_KEY = "fishFinderLeaderboard";
 const LAST_NAME_KEY = "fishFinderLastName";
@@ -135,8 +137,27 @@ function spritePool(category) {
   return window.FISH_SPRITES.filter((sprite) => sprite.category === category);
 }
 
-function scaleBoostFor(sprite) {
-  return sprite.width * sprite.height <= SMALL_FISH_AREA ? SMALL_FISH_BOOST * SMALLEST_EXTRA_BOOST : 1;
+function fishCountForLevel(level) {
+  return Math.min(MAX_FISH_COUNT, MIN_FISH_COUNT + (level - 1) * FISH_PER_LEVEL);
+}
+
+function maxLevel() {
+  return 1 + Math.ceil((MAX_FISH_COUNT - MIN_FISH_COUNT) / FISH_PER_LEVEL);
+}
+
+function speedForLevel(level) {
+  return Math.min(126, 38 + (level - 1) * 4.8);
+}
+
+function targetCountForLevel(level) {
+  const count = fishCountForLevel(level);
+  if (count >= 70) return 3;
+  if (count >= 40) return 2;
+  return 1;
+}
+
+function sizeForFish(isTarget) {
+  return pick(isTarget ? TARGET_SIZE_CLASSES : SIZE_CLASSES);
 }
 
 function nativeHeadAngle(sprite) {
@@ -216,11 +237,10 @@ function addLeaderboardScore(name, score) {
 
 function makeFish(sprite, forced = {}) {
   const img = state.images.get(sprite.id);
-  const baseScale = rand(0.42, 0.72) * Math.min(state.width / 1050, state.height / 720 + 0.12);
-  const boostedScale = (forced.scale || baseScale) * ALL_FISH_BOOST * scaleBoostFor(sprite);
-  const scale = Math.max(0.35, Math.min(1.04, boostedScale));
+  const isTarget = Boolean(forced.target);
+  const scale = forced.scale || sizeForFish(isTarget);
   const margin = Math.max(sprite.width, sprite.height) * scale * 0.7 + 18;
-  const speed = (32 + state.level * 9) * rand(0.72, 1.22);
+  const speed = speedForLevel(state.level) * rand(0.98, 1.02);
   const minY = Math.min(state.height - margin, TOP_SAFE + margin);
   const maxY = Math.max(minY + 1, state.height - margin);
   const swimDir = forced.swimDir ?? (Math.random() < 0.5 ? 1 : -1);
@@ -257,7 +277,7 @@ function chooseTarget() {
 }
 
 function buildSchool() {
-  const count = Math.min(18 + state.level * 3, 38);
+  const count = fishCountForLevel(state.level);
   const normal = window.FISH_SPRITES.filter((sprite) => sprite.category === "normal");
   const chosen = [];
   const forced = [];
@@ -265,29 +285,31 @@ function buildSchool() {
   if (state.target.key === "different") {
     const sprite = pick(normal);
     chosen.push(sprite);
-    forced.push({ sprite, options: { target: true, variant: "different", scale: rand(0.48, 0.76) } });
+    forced.push({ sprite, options: { target: true, variant: "different", scale: sizeForFish(true) } });
   } else {
-    const targetSprites = spritePool(state.target.key);
-    const targetCount = Math.min(targetSprites.length, state.level >= 4 ? 2 : 1);
-    shuffle(targetSprites)
-      .slice(0, targetCount)
-      .forEach((sprite) => {
-        chosen.push(sprite);
-        forced.push({ sprite, options: { target: true, scale: rand(0.48, 0.76) } });
-      });
+    const targetSprites = shuffle(spritePool(state.target.key));
+    const targetCount = targetCountForLevel(state.level);
+    for (let i = 0; i < targetCount; i += 1) {
+      const sprite = targetSprites[i % targetSprites.length];
+      chosen.push(sprite);
+      forced.push({ sprite, options: { target: true, scale: sizeForFish(true) } });
+    }
   }
 
-  const decoyPool = shuffle(window.FISH_SPRITES).filter((sprite) => !chosen.includes(sprite));
+  const decoyPool =
+    state.target.key === "different"
+      ? window.FISH_SPRITES
+      : window.FISH_SPRITES.filter((sprite) => sprite.category !== state.target.key);
   const fish = forced.map(({ sprite, options }) => makeFish(sprite, options));
-  while (fish.length < count && decoyPool.length) {
-    const sprite = decoyPool.pop();
-    fish.push(makeFish(sprite));
+  while (fish.length < count) {
+    const sprite = pick(decoyPool);
+    fish.push(makeFish(sprite, { scale: sizeForFish(false) }));
   }
   state.fish = shuffle(fish);
 }
 
 function newRound() {
-  state.level = 1 + Math.floor(state.hits / 4);
+  state.level = Math.min(maxLevel(), 1 + state.hits);
   chooseTarget();
   buildSchool();
   updateHud();
@@ -361,8 +383,7 @@ function handleHit(fish) {
     state.score += bonus;
     state.timeLeft = Math.min(60, state.timeLeft + 2.4 + Math.min(2, state.streak * 0.15));
     if (state.streak % 5 === 0) {
-      state.focus = 3.4;
-      showFeedback("慢一下", true);
+      showFeedback("連擊", true);
     } else {
       showFeedback(`+${bonus}`, true);
     }
@@ -471,7 +492,7 @@ function drawFish(fish) {
 }
 
 function updateFish(dt) {
-  const slow = state.focus > 0 ? 0.46 : 1;
+  const slow = 1;
   for (const fish of state.fish) {
     fish.wobble += dt * (fish.bobSpeed + state.level * 0.05);
     const w = fish.sprite.width * fish.scale;

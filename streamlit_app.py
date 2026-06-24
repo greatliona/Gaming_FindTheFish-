@@ -91,8 +91,8 @@ def load_game_html(stamp: tuple[float, ...]) -> str:
             <strong id="bestValue">0</strong>
           </div>
         </div>
-        <section class="leaderboard" aria-label="前十名">
-          <div class="leaderboard-title">前十名</div>
+        <section class="leaderboard" aria-label="本機前十名">
+          <div class="leaderboard-title">本機前十名</div>
           <ol id="leaderboardList"></ol>
         </section>
         <div class="combo-bar" aria-hidden="true">
