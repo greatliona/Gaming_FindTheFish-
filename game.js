@@ -32,9 +32,12 @@ const TARGETS = [
 const TOP_SAFE = 190;
 const SIZE_CLASSES = [0.8, 0.9, 1];
 const TARGET_SIZE_CLASSES = [0.8, 0.9];
+const MAX_LEVEL = 70;
 const MIN_FISH_COUNT = 10;
-const MAX_FISH_COUNT = 100;
-const FISH_PER_LEVEL = 5;
+const MAX_FISH_COUNT = 200;
+const MIN_SPEED = 38;
+const MAX_SPEED = 190;
+const HIT_TIME_REWARD_SCALE = 0.7;
 const SMALL_FISH_AREA = 9200;
 const LEADERBOARD_KEY = "fishFinderLeaderboard";
 const LAST_NAME_KEY = "fishFinderLastName";
@@ -140,22 +143,29 @@ function spritePool(category) {
   return window.FISH_SPRITES.filter((sprite) => sprite.category === category);
 }
 
+function levelProgress(level) {
+  return Math.max(0, Math.min(1, (level - 1) / (MAX_LEVEL - 1)));
+}
+
 function fishCountForLevel(level) {
-  return Math.min(MAX_FISH_COUNT, MIN_FISH_COUNT + (level - 1) * FISH_PER_LEVEL);
+  return Math.round(MIN_FISH_COUNT + levelProgress(level) * (MAX_FISH_COUNT - MIN_FISH_COUNT));
 }
 
 function maxLevel() {
-  return 1 + Math.ceil((MAX_FISH_COUNT - MIN_FISH_COUNT) / FISH_PER_LEVEL);
+  return MAX_LEVEL;
 }
 
 function speedForLevel(level) {
-  return Math.min(126, 38 + (level - 1) * 4.8);
+  const eased = Math.pow(levelProgress(level), 0.86);
+  return MIN_SPEED + eased * (MAX_SPEED - MIN_SPEED);
 }
 
 function targetCountForLevel(level) {
   const count = fishCountForLevel(level);
-  if (count >= 70) return 3;
-  if (count >= 40) return 2;
+  if (count >= 170) return 5;
+  if (count >= 125) return 4;
+  if (count >= 75) return 3;
+  if (count >= 35) return 2;
   return 1;
 }
 
@@ -471,7 +481,8 @@ function handleHit(fish) {
     state.streak += 1;
     const bonus = 100 + state.level * 12 + Math.min(10, state.streak) * 18;
     state.score += bonus;
-    state.timeLeft = Math.min(60, state.timeLeft + 2.4 + Math.min(2, state.streak * 0.15));
+    const timeReward = (2.4 + Math.min(2, state.streak * 0.15)) * HIT_TIME_REWARD_SCALE;
+    state.timeLeft = Math.min(60, state.timeLeft + timeReward);
     if (state.streak % 5 === 0) {
       showFeedback("連擊", true);
     } else {
