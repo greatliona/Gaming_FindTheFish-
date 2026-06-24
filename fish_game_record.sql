@@ -11,9 +11,6 @@ alter table public.fish_game_record enable row level security;
 grant select, insert on public.fish_game_record to anon;
 grant usage on sequence public.fish_game_record_id_seq to anon;
 
-drop policy if exists "fish_game_record_select_top_scores" on public.fish_game_record;
-drop policy if exists "fish_game_record_insert_scores" on public.fish_game_record;
-
 create policy "fish_game_record_select_top_scores"
 on public.fish_game_record
 for select
